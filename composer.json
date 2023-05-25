@@ -22,12 +22,12 @@
 	},
 	"autoload": {
 		"psr-4": {
-			"YOCLIB\\Multiformats\\Multiaddr\\": "src/"
+			"YOCLIB\\PropertyList\\": "src/"
 		}
 	},
 	"autoload-dev": {
 		"psr-4": {
-			"YOCLIB\\Multiformats\\Multiaddr\\Tests\\": "tests/"
+			"YOCLIB\\PropertyList\\Tests\\": "tests/"
 		}
 	}
 }
