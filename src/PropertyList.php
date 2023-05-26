@@ -16,6 +16,7 @@ class PropertyList{
 
     public const TYPE_ARRAY = 'array';
     public const TYPE_BOOLEAN = 'boolean';
+    public const TYPE_DATA = 'data';
     public const TYPE_DATE = 'date';
     public const TYPE_DICTIONARY = 'dictionary';
     public const TYPE_INTEGER = 'integer';
@@ -79,6 +80,9 @@ class PropertyList{
             return true;
         }
         if($type===self::TYPE_BOOLEAN && is_bool($object)){
+            return true;
+        }
+        if($type===self::TYPE_DATA && is_string($object) && !empty($object) && !ctype_print($object)){
             return true;
         }
         if($type===self::TYPE_DATE && $object instanceof DateTimeInterface){
@@ -155,6 +159,22 @@ class PropertyList{
             //TODO Binary
             if($format===self::FORMAT_JSON){
                 return json_encode($object);
+            }
+        }
+        if(self::isType($object,self::TYPE_DATA)){
+            if($format===self::FORMAT_ASCII){
+                return '<'.implode(' ',str_split(strtoupper(bin2hex($object)),16*2)).'>';
+            }
+            if($format===self::FORMAT_ASCII_GNUSTEP){
+                return '<'.implode(' ',str_split(strtoupper(bin2hex($object)),16*2)).'>';
+            }
+            //TODO GNU Binary
+            if($format===self::FORMAT_XML){
+                return '<data>'.base64_encode($object).'</data>';
+            }
+            //TODO Binary
+            if($format===self::FORMAT_JSON){
+                return json_encode(utf8_encode($object));
             }
         }
         if(self::isType($object,self::TYPE_DATE)){

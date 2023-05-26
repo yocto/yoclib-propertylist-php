@@ -81,6 +81,18 @@ class PropertyListTest extends TestCase{
         self::assertEquals('false',$plist->serialize(PropertyList::FORMAT_JSON));
     }
 
+    public function testSerializingPropertyListWithData(){
+        $plist = new PropertyList;
+        $plist->setObject(chr(0).chr(1).chr(2).chr(3).chr(172));
+
+        self::assertEquals('<00010203AC>',$plist->serialize(PropertyList::FORMAT_ASCII));
+        self::assertEquals('<00010203AC>',$plist->serialize(PropertyList::FORMAT_ASCII_GNUSTEP));
+        //self::assertEquals('',$plist->serialize(PropertyList::FORMAT_BINARY_GNUSTEP));
+        self::assertEquals('<plist xlmns="https://www.apple.com/DTDs/PropertyList-1.0.dtd" version="1.0"><data>AAECA6w=</data></plist>',$plist->serialize(PropertyList::FORMAT_XML));
+        //self::assertEquals('',$plist->serialize(PropertyList::FORMAT_BINARY));
+        self::assertEquals('"\u0000\u0001\u0002\u0003\u00ac"',$plist->serialize(PropertyList::FORMAT_JSON));
+    }
+
     public function testSerializingPropertyListWithDate(){
         $plist = new PropertyList;
         $plist->setObject(new DateTime('2023-05-25 15:16:17 +00:00'));
@@ -131,26 +143,26 @@ class PropertyListTest extends TestCase{
 
     public function testSerializingPropertyListWithArray(){
         $plist = new PropertyList;
-        $plist->setObject([true,false,new DateTime('2023-05-25 15:16:17 +00:00'),1234,12.34,'Hello there']);
+        $plist->setObject([true,false,chr(0).chr(1).chr(2).chr(3).chr(172),new DateTime('2023-05-25 15:16:17 +00:00'),1234,12.34,'Hello there']);
 
-        self::assertEquals('("true", "false", "2023-05-25 15:16:17 Z", "1234", "12.34", "Hello there")',$plist->serialize(PropertyList::FORMAT_ASCII));
-        self::assertEquals('(<*BY>, <*BN>, <*D2023-05-25 15:16:17 Z>, <*I1234>, <*R12.34>, "Hello there")',$plist->serialize(PropertyList::FORMAT_ASCII_GNUSTEP));
+        self::assertEquals('("true", "false", <00010203AC>, "2023-05-25 15:16:17 Z", "1234", "12.34", "Hello there")',$plist->serialize(PropertyList::FORMAT_ASCII));
+        self::assertEquals('(<*BY>, <*BN>, <00010203AC>, <*D2023-05-25 15:16:17 Z>, <*I1234>, <*R12.34>, "Hello there")',$plist->serialize(PropertyList::FORMAT_ASCII_GNUSTEP));
         //self::assertEquals('',$plist->serialize(PropertyList::FORMAT_BINARY_GNUSTEP));
-        self::assertEquals('<plist xlmns="https://www.apple.com/DTDs/PropertyList-1.0.dtd" version="1.0"><array><true/><false/><date>2023-05-25T15:16:17Z</date><integer>1234</integer><real>12.34</real><string>Hello there</string></array></plist>',$plist->serialize(PropertyList::FORMAT_XML));
+        self::assertEquals('<plist xlmns="https://www.apple.com/DTDs/PropertyList-1.0.dtd" version="1.0"><array><true/><false/><data>AAECA6w=</data><date>2023-05-25T15:16:17Z</date><integer>1234</integer><real>12.34</real><string>Hello there</string></array></plist>',$plist->serialize(PropertyList::FORMAT_XML));
         //self::assertEquals('',$plist->serialize(PropertyList::FORMAT_BINARY));
-        self::assertEquals('[true,false,"2023-05-25T15:16:17Z",1234,12.34,"Hello there"]',$plist->serialize(PropertyList::FORMAT_JSON));
+        self::assertEquals('[true,false,"\u0000\u0001\u0002\u0003\u00ac","2023-05-25T15:16:17Z",1234,12.34,"Hello there"]',$plist->serialize(PropertyList::FORMAT_JSON));
     }
 
     public function testSerializingPropertyListWithDictionary(){
         $plist = new PropertyList;
-        $plist->setObject((object) ['true key'=>true,'false key'=>false,'date key'=>new DateTime('2023-05-25 15:16:17 +00:00'),'integer key'=>1234,'real key'=>12.34,'string key'=>'Hello there']);
+        $plist->setObject((object) ['true key'=>true,'false key'=>false,'data key'=>chr(0).chr(1).chr(2).chr(3).chr(172),'date key'=>new DateTime('2023-05-25 15:16:17 +00:00'),'integer key'=>1234,'real key'=>12.34,'string key'=>'Hello there']);
 
-        self::assertEquals('{"true key" = "true"; "false key" = "false"; "date key" = "2023-05-25 15:16:17 Z"; "integer key" = "1234"; "real key" = "12.34"; "string key" = "Hello there";}',$plist->serialize(PropertyList::FORMAT_ASCII));
-        self::assertEquals('{"true key" = <*BY>; "false key" = <*BN>; "date key" = <*D2023-05-25 15:16:17 Z>; "integer key" = <*I1234>; "real key" = <*R12.34>; "string key" = "Hello there";}',$plist->serialize(PropertyList::FORMAT_ASCII_GNUSTEP));
+        self::assertEquals('{"true key" = "true"; "false key" = "false"; "data key" = <00010203AC>; "date key" = "2023-05-25 15:16:17 Z"; "integer key" = "1234"; "real key" = "12.34"; "string key" = "Hello there";}',$plist->serialize(PropertyList::FORMAT_ASCII));
+        self::assertEquals('{"true key" = <*BY>; "false key" = <*BN>; "data key" = <00010203AC>; "date key" = <*D2023-05-25 15:16:17 Z>; "integer key" = <*I1234>; "real key" = <*R12.34>; "string key" = "Hello there";}',$plist->serialize(PropertyList::FORMAT_ASCII_GNUSTEP));
         //self::assertEquals('',$plist->serialize(PropertyList::FORMAT_BINARY_GNUSTEP));
-        self::assertEquals('<plist xlmns="https://www.apple.com/DTDs/PropertyList-1.0.dtd" version="1.0"><dict><key>true key</key><true/><key>false key</key><false/><key>date key</key><date>2023-05-25T15:16:17Z</date><key>integer key</key><integer>1234</integer><key>real key</key><real>12.34</real><key>string key</key><string>Hello there</string></dict></plist>',$plist->serialize(PropertyList::FORMAT_XML));
+        self::assertEquals('<plist xlmns="https://www.apple.com/DTDs/PropertyList-1.0.dtd" version="1.0"><dict><key>true key</key><true/><key>false key</key><false/><key>data key</key><data>AAECA6w=</data><key>date key</key><date>2023-05-25T15:16:17Z</date><key>integer key</key><integer>1234</integer><key>real key</key><real>12.34</real><key>string key</key><string>Hello there</string></dict></plist>',$plist->serialize(PropertyList::FORMAT_XML));
         //self::assertEquals('',$plist->serialize(PropertyList::FORMAT_BINARY));
-        self::assertEquals('{"true key":true,"false key":false,"date key":"2023-05-25T15:16:17Z","integer key":1234,"real key":12.34,"string key":"Hello there"}',$plist->serialize(PropertyList::FORMAT_JSON));
+        self::assertEquals('{"true key":true,"false key":false,"data key":"\u0000\u0001\u0002\u0003\u00ac","date key":"2023-05-25T15:16:17Z","integer key":1234,"real key":12.34,"string key":"Hello there"}',$plist->serialize(PropertyList::FORMAT_JSON));
     }
 
 }
