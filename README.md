@@ -4,7 +4,7 @@ This yocLibrary enables your project to encode and decode Property List files in
 
 ## Status
 
-[![Build Status](https://travis-ci.com/yocto/yoclib-propertylist-php.svg?branch=master)](https://travis-ci.com/yocto/yoclib-propertylist-php)
+[![CI](https://github.com/yocto/yoclib-propertylist-php/actions/workflows/ci.yml/badge.svg)](https://github.com/yocto/yoclib-propertylist-php/actions/workflows/ci.yml)
 
 ## Installation
 
