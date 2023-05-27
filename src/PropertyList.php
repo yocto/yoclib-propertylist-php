@@ -2,6 +2,8 @@
 namespace YOCLIB\PropertyList;
 
 use DateTimeInterface;
+use Exception;
+use SimpleXMLElement;
 
 class PropertyList{
 
@@ -56,6 +58,35 @@ class PropertyList{
         $this->version = $version;
     }
 
+    public function deserialize($format,$input){
+        if($format===self::FORMAT_ASCII){
+            $this->object = self::deserializeObject($input,$format);
+        }
+        if($format===self::FORMAT_ASCII_GNUSTEP){
+            $this->object = self::deserializeObject($input,$format);
+        }
+        //TODO GNU Binary
+        if($format===self::FORMAT_XML){
+            try{
+                $plist = new SimpleXMLElement($input);
+                $object = $plist->children()[0] ?? null;
+                if($object){
+                    $this->object = self::deserializeObject($plist->children()[0],$format);
+                }
+            }catch(Exception $e){
+            }
+        }
+        //TODO Binary
+        if($format===self::FORMAT_JSON){
+            $this->object = self::deserializeObject(json_decode($input),$format);
+        }
+        return $this;
+    }
+
+    /**
+     * @param $format
+     * @return string|null
+     */
     public function serialize($format){
         if($format===self::FORMAT_ASCII){
             return self::serializeObject($this->object,$format);
@@ -65,8 +96,7 @@ class PropertyList{
         }
         //TODO GNU Binary
         if($format===self::FORMAT_XML){
-            $xml = '<plist xlmns="https://www.apple.com/DTDs/PropertyList-1.0.dtd" version="'.$this->version.'">'.self::serializeObject($this->object,$format).'</plist>';
-            return $xml;
+            return '<plist xlmns="https://www.apple.com/DTDs/PropertyList-1.0.dtd" version="'.$this->version.'">'.self::serializeObject($this->object,$format).'</plist>';
         }
         //TODO Binary
         if($format===self::FORMAT_JSON){
@@ -103,11 +133,129 @@ class PropertyList{
         return false;
     }
 
+    private static function deserializeObject($object,$format,$flags=0){
+        if($format===self::FORMAT_ASCII){
+            $type = null;
+            for($i=0;$i<strlen($object);$i++){
+                if($type==null){
+                    if($object[$i]==='"'){
+                        $type = self::TYPE_STRING;
+                        continue;
+                    }
+                    if($object[$i]==='<'){
+                        $type = self::TYPE_DATA;
+                        continue;
+                    }
+                    if($object[$i]==='('){
+                        $type = self::TYPE_ARRAY;
+                        continue;
+                    }
+                    if($object[$i]==='{'){
+                        $type = self::TYPE_DICTIONARY;
+                        continue;
+                    }
+                    break;
+                }
+            }
+
+            if($type===self::TYPE_ARRAY){
+                return [];
+            }
+            if($type===self::TYPE_DICTIONARY){
+                return (object) [];
+            }
+
+//            if($type!==null){
+//                if($object[$i]==='('){
+//                    self::deserializeObject(substr($object,$i),$format,$flags);
+//                }
+//                if($object[$i]==='{'){
+//                    self::deserializeObject(substr($object,$i),$format,$flags);
+//                }
+//            }
+
+//            return self::serializeObject($this->object,$format);
+            return null;
+        }
+        if($format===self::FORMAT_ASCII_GNUSTEP){
+            $type = null;
+            for($i=0;$i<strlen($object);$i++){
+                if($type==null){
+                    if($object[$i]==='"'){
+                        $type = self::TYPE_STRING;
+                        continue;
+                    }
+                    if($object[$i]==='<'){
+                        $type = self::TYPE_DATA;
+                        continue;
+                    }
+                    if($object[$i]==='('){
+                        $type = self::TYPE_ARRAY;
+                        continue;
+                    }
+                    if($object[$i]==='{'){
+                        $type = self::TYPE_DICTIONARY;
+                        continue;
+                    }
+                    break;
+                }
+            }
+
+            if($type===self::TYPE_ARRAY){
+                return [];
+            }
+            if($type===self::TYPE_DICTIONARY){
+                return (object) [];
+            }
+
+//            if($type!==null){
+//                if($object[$i]==='('){
+//                    self::deserializeObject(substr($object,$i),$format,$flags);
+//                }
+//                if($object[$i]==='{'){
+//                    self::deserializeObject(substr($object,$i),$format,$flags);
+//                }
+//            }
+
+//            return self::serializeObject($this->object,$format);
+            return null;
+        }
+        //TODO GNU Binary
+        if($format===self::FORMAT_XML){
+            $objectTag = $object->getName();
+            if($objectTag==='array'){
+                $arr = [];
+                foreach($object->children() AS $child){
+                    $arr[] = self::deserializeObject($child,$format);
+                }
+                return $arr;
+            }
+        }
+        //TODO Binary
+        if($format===self::FORMAT_JSON){
+            if(is_array($object)){
+                $arr = [];
+                foreach($object AS $item){
+                    $arr[] = self::deserializeObject($item,$format,$flags);
+                }
+                return $arr;
+            }
+            if(is_object($object)){
+                $arr = [];
+                foreach($object AS $item){
+                    $arr[] = self::deserializeObject($item,$format,$flags);
+                }
+                return (object) $arr;
+            }
+        }
+        return null;
+    }
+
     /**
      * @param mixed|DateTimeInterface $object
      * @param $format
      * @param $flags
-     * @return false|string
+     * @return string
      */
     private static function serializeObject($object,$format,$flags=0){
         if(self::isType($object,self::TYPE_ARRAY)){
