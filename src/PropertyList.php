@@ -1,6 +1,7 @@
 <?php
 namespace YOCLIB\PropertyList;
 
+use DateTime;
 use DateTimeInterface;
 use Exception;
 use SimpleXMLElement;
@@ -133,102 +134,390 @@ class PropertyList{
         return false;
     }
 
-    private static function deserializeObject($object,$format,$flags=0){
+    private static function deserializeObject($object,$format,$flags=0,&$hierarchyLength=0,$isXMLKey=false){
         if($format===self::FORMAT_ASCII){
             $type = null;
+            $quotationString = false;
             for($i=0;$i<strlen($object);$i++){
                 if($type==null){
                     if($object[$i]==='"'){
                         $type = self::TYPE_STRING;
-                        continue;
+                        $quotationString = true;
+                        break;
                     }
                     if($object[$i]==='<'){
                         $type = self::TYPE_DATA;
-                        continue;
+                        break;
                     }
                     if($object[$i]==='('){
                         $type = self::TYPE_ARRAY;
-                        continue;
+                        break;
                     }
                     if($object[$i]==='{'){
                         $type = self::TYPE_DICTIONARY;
-                        continue;
+                        break;
                     }
-                    break;
+                    if(ctype_alnum($object[$i])){
+                        $type = self::TYPE_STRING;
+                    }
                 }
             }
+            $index = $i;
 
             if($type===self::TYPE_ARRAY){
-                return [];
+                $array = [];
+                for($i=1;$i<strlen($object);$i++){
+                    $len = 0;
+                    $obj = self::deserializeObject(substr($object,$i),$format,$flags,$len);
+                    if($obj===null){
+                        break;
+                    }
+                    $i += $len;
+                    $array[] = $obj;
+                    for($j=$i;$j<strlen($object);$j++){
+                        $i++;
+                        if($object[$j]===','){
+                            break 1;
+                        }
+                        if($object[$j]===')'){
+                            $hierarchyLength = $j-$index+1;
+                            break 2;
+                        }
+                    }
+                }
+                return $array;
+            }
+            if($type===self::TYPE_DATA){
+                $data = '';
+                for($i=$index+1;$i<strlen($object);$i++){
+                    if($object[$i]==='>'){
+                        $hierarchyLength = $i-$index;
+                        break;
+                    }
+                    $data .= $object[$i];
+                }
+                return hex2bin(str_replace(' ','',$data));
             }
             if($type===self::TYPE_DICTIONARY){
-                return (object) [];
+                $dict = [];
+                for($i=1;$i<strlen($object);$i++){
+                    $len = 0;
+                    $key = self::deserializeObject(substr($object,$i),$format,$flags,$len);
+                    if($key===null){
+                        break;
+                    }
+                    $i += $len;
+                    for($j=$i;$j<strlen($object);$j++){
+                        $i++;
+                        $len++;
+                        if($object[$j]==='='){
+                            break 1;
+                        }
+                    }
+                    $i++;//TMP
+                    $obj = self::deserializeObject(substr($object,$i),$format,$flags,$len);
+                    if($obj===null){
+                        break;
+                    }
+                    $i += $len;
+                    $dict[$key] = $obj;
+                    for($j=$i;$j<strlen($object);$j++){
+                        $i++;
+                        if($object[$j]===';'){
+                            break 1;
+                        }
+                        if($object[$j]==='}'){
+                            $hierarchyLength = $i-$index;
+                            break 2;
+                        }
+                    }
+                }
+                return (object) $dict;
             }
-
-//            if($type!==null){
-//                if($object[$i]==='('){
-//                    self::deserializeObject(substr($object,$i),$format,$flags);
-//                }
-//                if($object[$i]==='{'){
-//                    self::deserializeObject(substr($object,$i),$format,$flags);
-//                }
-//            }
-
-//            return self::serializeObject($this->object,$format);
+            if($type==self::TYPE_STRING){
+                $string = '';
+                if($quotationString){
+                    for($i=$index+1;$i<strlen($object);$i++){
+                        if($object[$i]==='"'){
+                            $hierarchyLength = $i-$index;
+                            break;
+                        }
+                        $string .= $object[$i];
+                    }
+                }else{
+                    for($i=$index;$i<strlen($object);$i++){
+                        if(!ctype_alnum($object[$i])){
+                            $hierarchyLength = $i-$index;
+                            break;
+                        }
+                        $string .= $object[$i];
+                    }
+                }
+                $d1 = DateTime::createFromFormat('Y-m-d H:i:s O',$string);
+                $d2 = DateTime::createFromFormat('Y-m-d H:i:s \\Z',$string);
+                if($d1 || $d2){//TODO Add flags
+                    return $d1 ?? $d2;
+                }
+                if($string=='true'){//TODO Add flags
+                    return true;
+                }
+                if($string=='false'){//TODO Add flags
+                    return false;
+                }
+                return $string;
+            }
             return null;
         }
         if($format===self::FORMAT_ASCII_GNUSTEP){
             $type = null;
+            $quotationString = false;
             for($i=0;$i<strlen($object);$i++){
                 if($type==null){
                     if($object[$i]==='"'){
                         $type = self::TYPE_STRING;
-                        continue;
+                        $quotationString = true;
+                        break;
+                    }
+                    if($object[$i]==='<' && ($object[$i+1] ?? -1)==='*'){
+                        $subType = ($object[$i+2] ?? -1);
+                        if($subType==='B'){
+                            $type = self::TYPE_BOOLEAN;
+                        }
+                        if($subType==='D'){
+                            $type = self::TYPE_DATE;
+                        }
+                        if($subType==='I'){
+                            $type = self::TYPE_INTEGER;
+                        }
+                        if($subType==='R'){
+                            $type = self::TYPE_REAL;
+                        }
+                        break;
                     }
                     if($object[$i]==='<'){
                         $type = self::TYPE_DATA;
-                        continue;
+                        break;
                     }
                     if($object[$i]==='('){
                         $type = self::TYPE_ARRAY;
-                        continue;
+                        break;
                     }
                     if($object[$i]==='{'){
                         $type = self::TYPE_DICTIONARY;
-                        continue;
+                        break;
                     }
-                    break;
+                    if(ctype_alnum($object[$i])){
+                        $type = self::TYPE_STRING;
+                    }
                 }
             }
+            $index = $i;
 
             if($type===self::TYPE_ARRAY){
-                return [];
+                $array = [];
+                for($i=1;$i<strlen($object);$i++){
+                    $len = 0;
+                    $obj = self::deserializeObject(substr($object,$i),$format,$flags,$len);
+                    if($obj===null){
+                        break;
+                    }
+                    $i += $len;
+                    $array[] = $obj;
+                    for($j=$i;$j<strlen($object);$j++){
+                        $i++;
+                        if($object[$j]===','){
+                            break 1;
+                        }
+                        if($object[$j]===')'){
+                            $hierarchyLength = $i-$index;
+                            break 2;
+                        }
+                    }
+                }
+                return $array;
+            }
+            if($type===self::TYPE_BOOLEAN){
+                $boolean = '';
+                for($i=$index+3;$i<strlen($object);$i++){
+                    if($object[$i]==='>'){
+                        $hierarchyLength = $i-$index;
+                        break;
+                    }
+                    $boolean .= $object[$i];
+                }
+                if($boolean==='Y'){
+                    return true;
+                }
+                if($boolean==='N'){
+                    return false;
+                }
+                return null;
+            }
+            if($type===self::TYPE_DATA){
+                $data = '';
+                for($i=$index+1;$i<strlen($object);$i++){
+                    if($object[$i]==='>'){
+                        $hierarchyLength = $i-$index;
+                        break;
+                    }
+                    $data .= $object[$i];
+                }
+                return hex2bin(str_replace(' ','',$data));
+            }
+            if($type===self::TYPE_DATE){
+                $date = '';
+                for($i=$index+3;$i<strlen($object);$i++){
+                    if($object[$i]==='>'){
+                        $hierarchyLength = $i-$index;
+                        break;
+                    }
+                    $date .= $object[$i];
+                }
+                $d1 = DateTime::createFromFormat('Y-m-d H:i:s O',$date);
+                $d2 = DateTime::createFromFormat('Y-m-d H:i:s \\Z',$date);
+                if($d1 || $d2){
+                    return $d1 ?? $d2;
+                }
+                return null;
             }
             if($type===self::TYPE_DICTIONARY){
-                return (object) [];
+                $dict = [];
+                for($i=1;$i<strlen($object);$i++){
+                    $len = 0;
+                    $key = self::deserializeObject(substr($object,$i),$format,$flags,$len);
+                    if($key===null){
+                        break;
+                    }
+                    $i += $len;
+                    for($j=$i;$j<strlen($object);$j++){
+                        $i++;
+                        $len++;
+                        if($object[$j]==='='){
+                            break 1;
+                        }
+                    }
+                    $i++;//TMP
+                    $obj = self::deserializeObject(substr($object,$i),$format,$flags,$len);
+                    if($obj===null){
+                        break;
+                    }
+                    $i += $len;
+                    $dict[$key] = $obj;
+                    for($j=$i;$j<strlen($object);$j++){
+                        $i++;
+                        if($object[$j]===';'){
+                            break 1;
+                        }
+                        if($object[$j]==='}'){
+                            $hierarchyLength = $i-$index;
+                            break 2;
+                        }
+                    }
+                }
+                return (object) $dict;
             }
-
-//            if($type!==null){
-//                if($object[$i]==='('){
-//                    self::deserializeObject(substr($object,$i),$format,$flags);
-//                }
-//                if($object[$i]==='{'){
-//                    self::deserializeObject(substr($object,$i),$format,$flags);
-//                }
-//            }
-
-//            return self::serializeObject($this->object,$format);
+            if($type===self::TYPE_INTEGER){
+                $integer = '';
+                for($i=$index+3;$i<strlen($object);$i++){
+                    if($object[$i]==='>'){
+                        $hierarchyLength = $i-$index;
+                        break;
+                    }
+                    $integer .= $object[$i];
+                }
+                return intval($integer);
+            }
+            if($type===self::TYPE_REAL){
+                $real = '';
+                for($i=$index+3;$i<strlen($object);$i++){
+                    if($object[$i]==='>'){
+                        $hierarchyLength = $i-$index;
+                        break;
+                    }
+                    $real .= $object[$i];
+                }
+                return floatval($real);
+            }
+            if($type===self::TYPE_STRING){
+                $string = '';
+                if($quotationString){
+                    for($i=$index+1;$i<strlen($object);$i++){
+                        if($object[$i]==='"'){
+                            $hierarchyLength = $i-$index;
+                            break;
+                        }
+                        $string .= $object[$i];
+                    }
+                }else{
+                    for($i=$index;$i<strlen($object);$i++){
+                        if(!ctype_alnum($object[$i])){
+                            break;
+                        }
+                        $string .= $object[$i];
+                    }
+                }
+                return $string;
+            }
             return null;
         }
         //TODO GNU Binary
         if($format===self::FORMAT_XML){
             $objectTag = $object->getName();
+            if($isXMLKey){
+                if($objectTag==='key'){
+                    $string = (string) $object;
+                    return trim($string);
+                }
+                return null;
+            }
             if($objectTag==='array'){
                 $arr = [];
                 foreach($object->children() AS $child){
                     $arr[] = self::deserializeObject($child,$format);
                 }
                 return $arr;
+            }
+            if($objectTag==='true'){
+                return true;
+            }
+            if($objectTag==='false'){
+                return false;
+            }
+            if($objectTag==='data'){
+                $data = (string) $object;
+                return base64_decode($data);
+            }
+            if($objectTag==='date'){
+                $date = (string) $object;
+                $d1 = DateTime::createFromFormat('Y-m-d\\TH:i:sO',$date);
+                $d2 = DateTime::createFromFormat('Y-m-d\\TH:i:s\\Z',$date);
+                if($d1 || $d2){
+                    return $d1 ?? $d2;
+                }
+            }
+            if($objectTag==='dict'){
+                $children = [];
+                foreach($object->children() AS $child){
+                    $children[] = $child;
+                }
+                $dict = [];
+                for($i=0;$i<count($children);$i+=2){
+                    $len = -1;
+                    $key = self::deserializeObject($children[$i],$format,$flags,$len,true);
+                    $obj = self::deserializeObject($children[$i+1],$format);
+                    $dict[$key] = $obj;
+                }
+                return (object) $dict;
+            }
+            if($objectTag==='integer'){
+                return (int) $object;
+            }
+            if($objectTag==='real'){
+                return (double) $object;
+            }
+            if($objectTag==='string'){
+                $string = (string) $object;
+                return trim($string);
             }
         }
         //TODO Binary
@@ -240,10 +529,27 @@ class PropertyList{
                 }
                 return $arr;
             }
+            if(is_bool($object)){
+                return $object;
+            }
+            if(is_int($object)){
+                return $object;
+            }
+            if(is_float($object)){
+                return $object;
+            }
+            if(is_string($object)){
+                $d1 = DateTime::createFromFormat('Y-m-d\\TH:i:sO',$object);
+                $d2 = DateTime::createFromFormat('Y-m-d\\TH:i:s\\Z',$object);
+                if($d1 || $d2){//TODO Add flags
+                    return $d1 ?? $d2;
+                }
+                return utf8_decode($object);
+            }
             if(is_object($object)){
                 $arr = [];
-                foreach($object AS $item){
-                    $arr[] = self::deserializeObject($item,$format,$flags);
+                foreach($object AS $key=>$item){
+                    $arr[$key] = self::deserializeObject($item,$format,$flags);
                 }
                 return (object) $arr;
             }
